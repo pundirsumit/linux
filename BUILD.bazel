@@ -183,6 +183,7 @@ filegroup(
         # keep sorted
         "gki/aarch64/symbols/allwinner",
         "gki/aarch64/symbols/amlogic",
+	"gki/aarch64/symbols/beagley-ai",
         "gki/aarch64/symbols/bcmstb",
         "gki/aarch64/symbols/db845c",
         "gki/aarch64/symbols/desktop",
@@ -644,6 +645,111 @@ pkg_install(
     name = "kernel_x86_64_crashdump_dist",
     srcs = ["kernel_x86_64_crashdump_dist_files"],
     destdir = "out/kernel_x86_64_crashdump/dist",
+)
+
+_BEAGLEY_AI_MODULE_OUTS = [
+    # keep sorted
+    "drivers/tty/serial/8250/8250_omap.ko",
+]
+
+_BEAGLEY_AI_WATCHDOG_MODULE_OUTS = [
+    # keep sorted
+    "drivers/watchdog/rti_wdt.ko",
+]
+
+kernel_build(
+    name = "beagley-ai_no_kgdb",
+    srcs = [":kernel_aarch64_sources"],
+    outs = [
+        "arch/arm64/boot/dts/ti/k3-am67a-beagley-ai.dtb",
+    ],
+    arch = "arm64",
+    # Enable mixed build.
+    base_kernel = ":kernel_aarch64",
+    build_config = "build.config.beagley-ai",
+    collect_unstripped_modules = True,
+    defconfig = "arch/arm64/configs/gki_defconfig",
+    kmi_symbol_list = "gki/aarch64/symbols/beagley-ai",
+    make_goals = [
+        "modules",
+        "ti/k3-am67a-beagley-ai.dtb",
+    ],
+    makefile = ":Makefile",
+    module_outs = _BEAGLEY_AI_MODULE_OUTS + _BEAGLEY_AI_WATCHDOG_MODULE_OUTS,
+    pre_defconfig_fragments = ["arch/arm64/configs/beagley-ai_gki.fragment"],
+    strip_modules = True,
+)
+
+kernel_build(
+    name = "beagley-ai_with_kgdb",
+    srcs = [":kernel_aarch64_sources"],
+    outs = [
+        "arch/arm64/boot/dts/ti/k3-am67a-beagley-ai.dtb",
+    ],
+    arch = "arm64",
+    # Enable mixed build.
+    base_kernel = ":kernel_aarch64",
+    build_config = "build.config.beagley-ai",
+    defconfig = "arch/arm64/configs/gki_defconfig",
+    make_goals = [
+        "modules",
+        "ti/k3-am67a-beagley-ai.dtb",
+    ],
+    makefile = ":Makefile",
+    module_outs = _BEAGLEY_AI_MODULE_OUTS,
+    pre_defconfig_fragments = ["arch/arm64/configs/beagley-ai_gki.fragment"],
+    strip_modules = True,
+)
+
+alias(
+    name = "beagley-ai",
+    actual = select({
+        "//build/kernel/kleaf:kgdb_is_true": "beagley-ai_with_kgdb",
+        "//conditions:default": "beagley-ai_no_kgdb",
+    }),
+)
+
+kernel_abi(
+    name = "beagley-ai_abi",
+    kernel_build = ":beagley-ai",
+)
+
+kernel_modules_install(
+    name = "beagley-ai_modules_install",
+    kernel_build = ":beagley-ai",
+)
+
+merged_kernel_uapi_headers(
+    name = "beagley-ai_merged_kernel_uapi_headers",
+    kernel_build = ":beagley-ai",
+)
+
+initramfs(
+    name = "beagley-ai_initramfs",
+    kernel_modules_install = ":beagley-ai_modules_install",
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "beagley-ai_dist_files",
+    srcs = [
+        ":beagley-ai",
+        ":beagley-ai_initramfs",
+        ":beagley-ai_modules_install",
+        ":beagley-ai_merged_kernel_uapi_headers",
+        # Mixed build: Additional GKI artifacts.
+        ":kernel_aarch64",
+        ":kernel_aarch64_modules",
+        ":kernel_aarch64_additional_artifacts",
+    ],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "beagley-ai_dist",
+    srcs = [":beagley-ai_dist_files"],
+    destdir = "out/beagley-ai/dist",
 )
 
 _DB845C_MODULE_OUTS = [
